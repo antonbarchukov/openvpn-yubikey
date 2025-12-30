@@ -1,0 +1,5 @@
+# Credentials - never commit this
+vpn-connect.conf
+
+# macOS
+.DS_Store

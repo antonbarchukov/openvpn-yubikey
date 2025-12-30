@@ -1,0 +1,31 @@
+#!/usr/bin/expect -f
+
+set config [lindex $argv 0]
+set username [lindex $argv 1]
+set password [lindex $argv 2]
+set totp [lindex $argv 3]
+
+if {[file exists /opt/homebrew/sbin/openvpn]} {
+    set openvpn /opt/homebrew/sbin/openvpn
+} elseif {[file exists /usr/local/sbin/openvpn]} {
+    set openvpn /usr/local/sbin/openvpn
+} else {
+    puts "\[error\] openvpn not found"
+    exit 1
+}
+
+spawn $openvpn --config $config --script-security 2 --up /etc/openvpn/update-dns.sh --down /etc/openvpn/update-dns.sh
+
+expect "Enter Auth Username:"
+send "$username\r"
+
+expect "Enter Auth Password:"
+send "$password\r"
+
+expect "CHALLENGE:"
+send "$totp\r"
+
+expect "Initialization Sequence Completed"
+
+set timeout -1
+expect eof

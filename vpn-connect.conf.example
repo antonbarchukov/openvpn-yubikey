@@ -1,0 +1,13 @@
+# openvpn-yubikey config
+# copy to vpn-connect.conf and fill in your values
+
+# path to your .ovpn config file
+CONFIG="/path/to/your-config.ovpn"
+
+# vpn credentials
+USERNAME="your-username"
+PASSWORD="your-password"
+
+# yubikey oath account name
+# run 'ykman oath accounts list' to find it
+TOTP_ACCOUNT="OpenVPN:your-account@your-server.com"
