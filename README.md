@@ -4,17 +4,30 @@ Connect to OpenVPN with YubiKey TOTP authentication. Automatically fetches the T
 
 ## what it does
 
-1. Reads your VPN credentials from `vpn-connect.conf`
+1. Reads your VPN credentials from `vpn.conf`
 2. Fetches the current TOTP code from your YubiKey via `ykman`
-3. Spawns OpenVPN and automatically enters username, password, and TOTP
-4. Configures DNS resolvers for VPN domains (macOS `/etc/resolver`)
+3. Spawns OpenVPN 3 and automatically enters username, password, and TOTP
+4. DNS is handled automatically by OpenVPN 3
 
 ## requirements
 
-- macOS
-- OpenVPN (`brew install openvpn`)
-- YubiKey with OATH TOTP configured (`brew install ykman`)
+### macOS
+
+- OpenVPN 3 (`brew install openvpn`)
+- YubiKey Manager (`brew install ykman`)
 - expect (`brew install expect`)
+
+### Linux (Arch)
+
+- OpenVPN 3 (`yay -S openvpn3`)
+- YubiKey Manager (`yay -S yubikey-manager`)
+- expect (`sudo pacman -S expect`)
+
+### Linux (Ubuntu/Debian)
+
+- OpenVPN 3 (see [openvpn.net docs](https://openvpn.net/cloud-docs/owner/connectors/connector-user-guides/openvpn-3-client-for-linux.html))
+- YubiKey Manager (`sudo apt install yubikey-manager`)
+- expect (`sudo apt install expect`)
 
 ## install
 
@@ -26,23 +39,28 @@ cd openvpn-yubikey
 
 ### what install.sh does
 
-1. Checks that `ykman`, `expect`, and `openvpn` are installed
+1. Checks that `ykman`, `expect`, and `openvpn3` are installed
 2. Creates symlinks:
-   - `/usr/local/bin/vpn-connect` -> `vpn-connect.sh`
-   - `/usr/local/bin/vpn-disconnect` -> `vpn-disconnect.sh`
-3. Installs DNS handler:
-   - `/etc/openvpn/update-dns.sh` -> `update-dns.sh`
-4. Creates `vpn-connect.conf` from template if it doesn't exist
+   - `/usr/local/bin/vpn-on` -> `vpn-on.sh`
+   - `/usr/local/bin/vpn-off` -> `vpn-off.sh`
+   - `/usr/local/bin/vpn-status` -> `vpn-status.sh`
+3. Creates `vpn.conf` from template if it doesn't exist
 
 ## setup
 
-Edit `vpn-connect.conf` with your credentials:
+First, import your OpenVPN config:
 
 ```bash
-CONFIG="/path/to/your-config.ovpn"
+openvpn3 config-import --config your-config.ovpn --name myconfig
+```
+
+Then edit `vpn.conf` with your credentials:
+
+```bash
+CONFIG="myconfig"                                    # openvpn3 config name
 USERNAME="your-username"
 PASSWORD="your-password"
-TOTP_ACCOUNT="OpenVPN:your-account@your-server.com"
+TOTP_ACCOUNT="OpenVPN:your-account@your-server.com"  # from ykman oath accounts list
 ```
 
 To find your TOTP account name:
@@ -54,38 +72,35 @@ ykman oath accounts list
 ## usage
 
 ```bash
-vpn-connect      # connect (requires yubikey)
-vpn-disconnect   # disconnect
+vpn-on       # connect (requires yubikey)
+vpn-off      # disconnect
+vpn-status   # show connection status
 ```
 
 ## how it works
 
 ### connect flow
 
-1. `vpn-connect` reads credentials from `vpn-connect.conf`
+1. `vpn-on` reads credentials from `vpn.conf`
 2. Calls `ykman oath accounts code <account>` to get the current 6-digit TOTP from your YubiKey
-3. Spawns `vpn-expect.exp` which launches OpenVPN in the background
+3. Spawns `vpn-expect.exp` which runs `openvpn3 session-start`
 4. The expect script handles OpenVPN's interactive prompts:
-   - "Enter Auth Username:" -> sends username
-   - "Enter Auth Password:" -> sends password
-   - "CHALLENGE:" -> sends TOTP code
-5. Once connected, OpenVPN calls `update-dns.sh` with `script_type=up`
-6. DNS handler creates `/etc/resolver/<domain>` files for each VPN domain
-7. macOS automatically routes DNS queries for those domains through the VPN
+   - "Auth User name:" -> sends username
+   - "Auth Password:" -> sends password
+   - "CHALLENGE:" / "Response:" -> sends TOTP code
+5. OpenVPN 3 handles DNS configuration automatically
 
 ### disconnect flow
 
-1. `vpn-disconnect` runs `killall openvpn`
-2. OpenVPN receives SIGTERM and calls `update-dns.sh` with `script_type=down`
-3. DNS handler removes the `/etc/resolver/<domain>` files it created
-4. DNS returns to normal
+1. `vpn-off` runs `openvpn3 session-manage --disconnect`
+2. OpenVPN 3 cleans up DNS automatically
 
 ### files
 
 ```
-vpn-connect.sh      main script, fetches totp and launches vpn
-vpn-expect.exp      expect script, handles interactive auth prompts
-update-dns.sh       called by openvpn to configure/cleanup dns
-vpn-disconnect.sh   kills openvpn (cleanup happens automatically)
-vpn-connect.conf    your credentials (gitignored)
+vpn-on.sh         main script, fetches totp and launches vpn
+vpn-expect.exp    expect script, handles interactive auth prompts
+vpn-off.sh        disconnects the vpn session
+vpn-status.sh     shows current vpn status
+vpn.conf          your credentials (gitignored)
 ```

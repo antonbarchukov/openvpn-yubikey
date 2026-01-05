@@ -1,8 +1,9 @@
 # openvpn-yubikey config
-# copy to vpn-connect.conf and fill in your values
+# copy to vpn.conf and fill in your values
 
-# path to your .ovpn config file
-CONFIG="/path/to/your-config.ovpn"
+# openvpn3 config name (from 'openvpn3 configs-list')
+# import first with: openvpn3 config-import --config your.ovpn --name myconfig
+CONFIG="myconfig"
 
 # vpn credentials
 USERNAME="your-username"

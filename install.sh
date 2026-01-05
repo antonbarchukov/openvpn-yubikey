@@ -16,30 +16,53 @@ echo -e "${BOLD}openvpn-yubikey installer${NC}"
 echo -e "${DIM}--------------------------------${NC}"
 echo ""
 
+# Detect OS
+OS="$(uname -s)"
+case "$OS" in
+    Linux*)  OS_TYPE="linux" ;;
+    Darwin*) OS_TYPE="macos" ;;
+    *)       OS_TYPE="unknown" ;;
+esac
+
+echo -e "${DIM}detected: ${OS_TYPE}${NC}"
+echo ""
+
 # Check dependencies
-echo -e "${CYAN}[1/4]${NC} checking dependencies..."
+echo -e "${CYAN}[1/3]${NC} checking dependencies..."
 
 missing=0
 
 if ! command -v ykman &> /dev/null; then
-    echo -e "      ${RED}x${NC} ykman      ${DIM}brew install ykman${NC}"
+    if [ "$OS_TYPE" = "macos" ]; then
+        echo -e "      ${RED}x${NC} ykman      ${DIM}brew install ykman${NC}"
+    else
+        echo -e "      ${RED}x${NC} ykman      ${DIM}yay -S yubikey-manager ${NC}${DIM}OR${NC}${DIM} sudo apt install yubikey-manager${NC}"
+    fi
     missing=1
 else
     echo -e "      ${GREEN}+${NC} ykman"
 fi
 
 if ! command -v expect &> /dev/null; then
-    echo -e "      ${RED}x${NC} expect     ${DIM}brew install expect${NC}"
+    if [ "$OS_TYPE" = "macos" ]; then
+        echo -e "      ${RED}x${NC} expect     ${DIM}brew install expect${NC}"
+    else
+        echo -e "      ${RED}x${NC} expect     ${DIM}sudo pacman -S expect ${NC}${DIM}OR${NC}${DIM} sudo apt install expect${NC}"
+    fi
     missing=1
 else
     echo -e "      ${GREEN}+${NC} expect"
 fi
 
-if [ ! -f /opt/homebrew/sbin/openvpn ] && [ ! -f /usr/local/sbin/openvpn ]; then
-    echo -e "      ${RED}x${NC} openvpn    ${DIM}brew install openvpn${NC}"
+if ! command -v openvpn3 &> /dev/null; then
+    if [ "$OS_TYPE" = "macos" ]; then
+        echo -e "      ${RED}x${NC} openvpn3   ${DIM}brew install openvpn${NC}"
+    else
+        echo -e "      ${RED}x${NC} openvpn3   ${DIM}yay -S openvpn3 ${NC}${DIM}OR${NC}${DIM} see openvpn.net/cloud-docs${NC}"
+    fi
     missing=1
 else
-    echo -e "      ${GREEN}+${NC} openvpn"
+    echo -e "      ${GREEN}+${NC} openvpn3"
 fi
 
 if [ $missing -eq 1 ]; then
@@ -49,25 +72,21 @@ if [ $missing -eq 1 ]; then
 fi
 
 echo ""
-echo -e "${CYAN}[2/4]${NC} creating symlinks..."
-sudo ln -sf "${SCRIPT_DIR}/vpn-connect.sh" /usr/local/bin/vpn-connect
-sudo ln -sf "${SCRIPT_DIR}/vpn-disconnect.sh" /usr/local/bin/vpn-disconnect
-echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-connect"
-echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-disconnect"
+echo -e "${CYAN}[2/3]${NC} creating symlinks..."
+sudo ln -sf "${SCRIPT_DIR}/vpn-on.sh" /usr/local/bin/vpn-on
+sudo ln -sf "${SCRIPT_DIR}/vpn-off.sh" /usr/local/bin/vpn-off
+sudo ln -sf "${SCRIPT_DIR}/vpn-status.sh" /usr/local/bin/vpn-status
+echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-on"
+echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-off"
+echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-status"
 
 echo ""
-echo -e "${CYAN}[3/4]${NC} installing dns handler..."
-sudo mkdir -p /etc/openvpn
-sudo ln -sf "${SCRIPT_DIR}/update-dns.sh" /etc/openvpn/update-dns.sh
-echo -e "      ${GREEN}+${NC} /etc/openvpn/update-dns.sh"
-
-echo ""
-echo -e "${CYAN}[4/4]${NC} setting up config..."
-if [ ! -f "${SCRIPT_DIR}/vpn-connect.conf" ]; then
-    cp "${SCRIPT_DIR}/vpn-connect.conf.example" "${SCRIPT_DIR}/vpn-connect.conf"
-    echo -e "      ${GREEN}+${NC} created vpn-connect.conf from template"
+echo -e "${CYAN}[3/3]${NC} setting up config..."
+if [ ! -f "${SCRIPT_DIR}/vpn.conf" ]; then
+    cp "${SCRIPT_DIR}/vpn.conf.example" "${SCRIPT_DIR}/vpn.conf"
+    echo -e "      ${GREEN}+${NC} created vpn.conf from template"
 else
-    echo -e "      ${DIM}-${NC} vpn-connect.conf already exists"
+    echo -e "      ${DIM}-${NC} vpn.conf already exists"
 fi
 
 echo ""
@@ -75,10 +94,12 @@ echo -e "${DIM}--------------------------------${NC}"
 echo -e "${GREEN}[done]${NC} installation complete"
 echo ""
 echo -e "${BOLD}usage${NC}"
-echo -e "  vpn-connect      connect to vpn"
-echo -e "  vpn-disconnect   disconnect from vpn"
+echo -e "  vpn-on       connect to vpn"
+echo -e "  vpn-off      disconnect from vpn"
+echo -e "  vpn-status   show vpn status"
 echo ""
 echo -e "${BOLD}next steps${NC}"
-echo -e "  1. edit ${CYAN}vpn-connect.conf${NC} with your credentials"
-echo -e "  2. run ${CYAN}ykman oath accounts list${NC} to find your totp account"
+echo -e "  1. import your ovpn config: ${CYAN}openvpn3 config-import --config your.ovpn --name myconfig${NC}"
+echo -e "  2. edit ${CYAN}vpn.conf${NC} with your credentials"
+echo -e "  3. run ${CYAN}ykman oath accounts list${NC} to find your totp account"
 echo ""
