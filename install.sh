@@ -54,15 +54,20 @@ else
     echo -e "      ${GREEN}+${NC} expect"
 fi
 
-if ! command -v openvpn3 &> /dev/null; then
-    if [ "$OS_TYPE" = "macos" ]; then
-        echo -e "      ${RED}x${NC} openvpn3   ${DIM}brew install openvpn${NC}"
+if [ "$OS_TYPE" = "macos" ]; then
+    if [ -x /opt/homebrew/sbin/openvpn ] || [ -x /usr/local/sbin/openvpn ]; then
+        echo -e "      ${GREEN}+${NC} openvpn"
     else
-        echo -e "      ${RED}x${NC} openvpn3   ${DIM}yay -S openvpn3 ${NC}${DIM}OR${NC}${DIM} see openvpn.net/cloud-docs${NC}"
+        echo -e "      ${RED}x${NC} openvpn    ${DIM}brew install openvpn${NC}"
+        missing=1
     fi
-    missing=1
 else
-    echo -e "      ${GREEN}+${NC} openvpn3"
+    if ! command -v openvpn3 &> /dev/null; then
+        echo -e "      ${RED}x${NC} openvpn3   ${DIM}yay -S openvpn3 ${NC}${DIM}OR${NC}${DIM} see openvpn.net/cloud-docs${NC}"
+        missing=1
+    else
+        echo -e "      ${GREEN}+${NC} openvpn3"
+    fi
 fi
 
 if [ $missing -eq 1 ]; then
@@ -72,7 +77,7 @@ if [ $missing -eq 1 ]; then
 fi
 
 echo ""
-echo -e "${CYAN}[2/3]${NC} creating symlinks..."
+echo -e "${CYAN}[2/4]${NC} creating symlinks..."
 sudo ln -sf "${SCRIPT_DIR}/vpn-on.sh" /usr/local/bin/vpn-on
 sudo ln -sf "${SCRIPT_DIR}/vpn-off.sh" /usr/local/bin/vpn-off
 sudo ln -sf "${SCRIPT_DIR}/vpn-status.sh" /usr/local/bin/vpn-status
@@ -81,7 +86,18 @@ echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-off"
 echo -e "      ${GREEN}+${NC} /usr/local/bin/vpn-status"
 
 echo ""
-echo -e "${CYAN}[3/3]${NC} setting up config..."
+if [ "$OS_TYPE" = "macos" ]; then
+    echo -e "${CYAN}[3/4]${NC} installing dns handler..."
+    sudo mkdir -p /etc/openvpn
+    sudo cp "${SCRIPT_DIR}/update-dns.sh" /etc/openvpn/update-dns.sh
+    sudo chmod +x /etc/openvpn/update-dns.sh
+    echo -e "      ${GREEN}+${NC} /etc/openvpn/update-dns.sh"
+else
+    echo -e "${CYAN}[3/4]${NC} skipping dns handler (not needed on linux)"
+fi
+
+echo ""
+echo -e "${CYAN}[4/4]${NC} setting up config..."
 if [ ! -f "${SCRIPT_DIR}/vpn.conf" ]; then
     cp "${SCRIPT_DIR}/vpn.conf.example" "${SCRIPT_DIR}/vpn.conf"
     echo -e "      ${GREEN}+${NC} created vpn.conf from template"
@@ -99,7 +115,11 @@ echo -e "  vpn-off      disconnect from vpn"
 echo -e "  vpn-status   show vpn status"
 echo ""
 echo -e "${BOLD}next steps${NC}"
+if [ "$OS_TYPE" = "macos" ]; then
+echo -e "  1. copy your .ovpn config file to this directory"
+else
 echo -e "  1. import your ovpn config: ${CYAN}openvpn3 config-import --config your.ovpn --name myconfig${NC}"
+fi
 echo -e "  2. edit ${CYAN}vpn.conf${NC} with your credentials"
 echo -e "  3. run ${CYAN}ykman oath accounts list${NC} to find your totp account"
 echo ""

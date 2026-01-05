@@ -16,6 +16,14 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# Detect OS
+OS="$(uname -s)"
+case "$OS" in
+    Linux*)  OS_TYPE="linux" ;;
+    Darwin*) OS_TYPE="macos" ;;
+    *)       OS_TYPE="unknown" ;;
+esac
+
 echo ""
 echo -e "${BOLD}openvpn-yubikey${NC}"
 echo -e "${DIM}--------------------------------${NC}"
@@ -34,10 +42,18 @@ if [ -z "$CONFIG" ] || [ -z "$USERNAME" ] || [ -z "$PASSWORD" ] || [ -z "$TOTP_A
 fi
 
 # Check if already connected
-if openvpn3 sessions-list 2>/dev/null | grep -q "$CONFIG"; then
-    echo -e "${DIM}[info]${NC} already connected to $CONFIG"
-    echo ""
-    exit 0
+if [ "$OS_TYPE" = "macos" ]; then
+    if pgrep -x openvpn > /dev/null; then
+        echo -e "${DIM}[info]${NC} already connected"
+        echo ""
+        exit 0
+    fi
+else
+    if openvpn3 sessions-list 2>/dev/null | grep -q "$CONFIG"; then
+        echo -e "${DIM}[info]${NC} already connected to $CONFIG"
+        echo ""
+        exit 0
+    fi
 fi
 
 # Check if YubiKey is connected
@@ -67,13 +83,26 @@ TOTP=$(echo "$TOTP" | awk '{print $NF}')
 echo -e "${CYAN}[2/3]${NC} got totp: ${BOLD}$TOTP${NC}"
 echo -e "${CYAN}[3/3]${NC} connecting to vpn..."
 
-"${SCRIPT_DIR}/vpn-expect.exp" "$CONFIG" "$USERNAME" "$PASSWORD" "$TOTP" > /tmp/openvpn3.log 2>&1
+if [ "$OS_TYPE" = "macos" ]; then
+    nohup sudo "${SCRIPT_DIR}/vpn-expect.exp" "$CONFIG" "$USERNAME" "$PASSWORD" "$TOTP" > /tmp/openvpn.log 2>&1 &
+    sleep 8
 
-echo ""
-if openvpn3 sessions-list 2>/dev/null | grep -q "$CONFIG"; then
-    echo -e "${GREEN}[connected]${NC} vpn session active"
-    echo -e "${DIM}            run 'vpn-off' to disconnect${NC}"
+    echo ""
+    if pgrep -x openvpn > /dev/null; then
+        echo -e "${GREEN}[connected]${NC} vpn running in background"
+        echo -e "${DIM}            run 'vpn-off' to disconnect${NC}"
+    else
+        echo -e "${RED}[failed]${NC} check /tmp/openvpn.log for details"
+    fi
 else
-    echo -e "${RED}[failed]${NC} check /tmp/openvpn3.log for details"
+    "${SCRIPT_DIR}/vpn-expect.exp" "$CONFIG" "$USERNAME" "$PASSWORD" "$TOTP" > /tmp/openvpn3.log 2>&1
+
+    echo ""
+    if openvpn3 sessions-list 2>/dev/null | grep -q "$CONFIG"; then
+        echo -e "${GREEN}[connected]${NC} vpn session active"
+        echo -e "${DIM}            run 'vpn-off' to disconnect${NC}"
+    else
+        echo -e "${RED}[failed]${NC} check /tmp/openvpn3.log for details"
+    fi
 fi
 echo ""

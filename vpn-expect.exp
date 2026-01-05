@@ -7,50 +7,95 @@ set totp [lindex $argv 3]
 
 set timeout 60
 
-spawn openvpn3 session-start --config $config
+# Detect OS
+set os [exec uname -s]
 
-expect {
-    "Auth User name:" {
-        send "$username\r"
-        exp_continue
-    }
-    "Auth Password:" {
-        send "$password\r"
-        exp_continue
-    }
-    "CHALLENGE:" {
-        send "$totp\r"
-        exp_continue
-    }
-    "Enter Authenticator Code:" {
-        send "$totp\r"
-        exp_continue
-    }
-    "Enter Auth Username:" {
-        send "$username\r"
-        exp_continue
-    }
-    "Enter Auth Password:" {
-        send "$password\r"
-        exp_continue
-    }
-    "Response:" {
-        send "$totp\r"
-        exp_continue
-    }
-    "Connected" {
-        puts "\n\[connected\] session established"
-        exit 0
-    }
-    "Connection statistics" {
-        puts "\n\[connected\] session established"
-        exit 0
-    }
-    timeout {
-        puts "\n\[error\] connection timeout"
+if {$os eq "Darwin"} {
+    # macOS: use openvpn 2.x
+    if {[file exists /opt/homebrew/sbin/openvpn]} {
+        set openvpn /opt/homebrew/sbin/openvpn
+    } elseif {[file exists /usr/local/sbin/openvpn]} {
+        set openvpn /usr/local/sbin/openvpn
+    } else {
+        puts "\[error\] openvpn not found"
         exit 1
     }
-    eof {
-        exit 0
+
+    spawn $openvpn --config $config --script-security 2 --up /etc/openvpn/update-dns.sh --down /etc/openvpn/update-dns.sh
+
+    expect {
+        "Enter Auth Username:" {
+            send "$username\r"
+            exp_continue
+        }
+        "Enter Auth Password:" {
+            send "$password\r"
+            exp_continue
+        }
+        "CHALLENGE:" {
+            send "$totp\r"
+            exp_continue
+        }
+        "Initialization Sequence Completed" {
+            puts "\n\[connected\] session established"
+            set timeout -1
+            expect eof
+        }
+        timeout {
+            puts "\n\[error\] connection timeout"
+            exit 1
+        }
+        eof {
+            exit 0
+        }
+    }
+} else {
+    # Linux: use openvpn3
+    spawn openvpn3 session-start --config $config
+
+    expect {
+        "Auth User name:" {
+            send "$username\r"
+            exp_continue
+        }
+        "Auth Password:" {
+            send "$password\r"
+            exp_continue
+        }
+        "CHALLENGE:" {
+            send "$totp\r"
+            exp_continue
+        }
+        "Enter Authenticator Code:" {
+            send "$totp\r"
+            exp_continue
+        }
+        "Enter Auth Username:" {
+            send "$username\r"
+            exp_continue
+        }
+        "Enter Auth Password:" {
+            send "$password\r"
+            exp_continue
+        }
+        "Response:" {
+            send "$totp\r"
+            exp_continue
+        }
+        "Connected" {
+            puts "\n\[connected\] session established"
+            exit 0
+        }
+        "Connection statistics" {
+            puts "\n\[connected\] session established"
+            exit 0
+        }
+        timeout {
+            puts "\n\[error\] connection timeout"
+            exit 1
+        }
+        eof {
+            exit 0
+        }
     }
 }
