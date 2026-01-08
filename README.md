@@ -70,10 +70,10 @@ TOTP_ACCOUNT="OpenVPN:your-account@your-server.com"  # from ykman oath accounts 
 
 ### Linux
 
-First, import your OpenVPN config:
+First, import your OpenVPN config (note the --persistent flag, otherwise config is treated as a session config):
 
 ```bash
-openvpn3 config-import --config your-config.ovpn --name myconfig
+openvpn3 config-import --config your-config.ovpn --name myconfig --persistent
 ```
 
 Then edit `vpn.conf`:
