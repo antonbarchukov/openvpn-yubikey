@@ -89,8 +89,7 @@ echo ""
 if [ "$OS_TYPE" = "macos" ]; then
     echo -e "${CYAN}[3/4]${NC} installing dns handler..."
     sudo mkdir -p /etc/openvpn
-    sudo cp "${SCRIPT_DIR}/update-dns.sh" /etc/openvpn/update-dns.sh
-    sudo chmod +x /etc/openvpn/update-dns.sh
+    sudo ln -sf "${SCRIPT_DIR}/update-dns.sh" /etc/openvpn/update-dns.sh
     echo -e "      ${GREEN}+${NC} /etc/openvpn/update-dns.sh"
 else
     echo -e "${CYAN}[3/4]${NC} skipping dns handler (not needed on linux)"
