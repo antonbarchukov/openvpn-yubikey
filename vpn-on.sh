@@ -84,15 +84,34 @@ echo -e "${CYAN}[2/3]${NC} got totp: ${BOLD}$TOTP${NC}"
 echo -e "${CYAN}[3/3]${NC} connecting to vpn..."
 
 if [ "$OS_TYPE" = "macos" ]; then
+    > /tmp/openvpn.log
     nohup sudo "${SCRIPT_DIR}/vpn-expect.exp" "$CONFIG" "$USERNAME" "$PASSWORD" "$TOTP" > /tmp/openvpn.log 2>&1 &
-    sleep 8
+    VPN_PID=$!
+
+    # Wait for the expect script to report success or failure (up to 90s)
+    WAITED=0
+    MAX_WAIT=90
+    while [ $WAITED -lt $MAX_WAIT ]; do
+        if grep -q "Initialization Sequence Completed" /tmp/openvpn.log 2>/dev/null; then
+            break
+        fi
+        if grep -q "\[error\]" /tmp/openvpn.log 2>/dev/null; then
+            break
+        fi
+        if ! kill -0 $VPN_PID 2>/dev/null; then
+            break
+        fi
+        sleep 1
+        WAITED=$((WAITED + 1))
+    done
 
     echo ""
-    if pgrep -x openvpn > /dev/null; then
-        echo -e "${GREEN}[connected]${NC} vpn running in background"
+    if grep -q "Initialization Sequence Completed" /tmp/openvpn.log 2>/dev/null && pgrep -x openvpn > /dev/null; then
+        echo -e "${GREEN}[connected]${NC} vpn running in background (${WAITED}s)"
         echo -e "${DIM}            run 'vpn-off' to disconnect${NC}"
     else
-        echo -e "${RED}[failed]${NC} check /tmp/openvpn.log for details"
+        echo -e "${RED}[failed]${NC} connection did not establish within ${MAX_WAIT}s"
+        echo -e "${DIM}          check /tmp/openvpn.log for details${NC}"
     fi
 else
     "${SCRIPT_DIR}/vpn-expect.exp" "$CONFIG" "$USERNAME" "$PASSWORD" "$TOTP" > /tmp/openvpn3.log 2>&1
